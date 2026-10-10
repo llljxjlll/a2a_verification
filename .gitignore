@@ -1,0 +1,12 @@
+# Local agent and credential state
+/.agents/
+/.aws/
+/.codex/
+
+# The target repository is public; keep the anonymous submission local.
+/hpca2027-paper1894.pdf
+
+# Common generated files
+**/__pycache__/
+*.py[cod]
+.DS_Store
