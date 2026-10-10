@@ -42,7 +42,9 @@ class AstraSimTests(unittest.TestCase):
             RUN.parse_completion_cycles(output)
 
     def test_probe_factor_snapping(self) -> None:
-        cycles = math.ceil((1 << 20) / 2 / 100.0)
+        cycles = math.ceil(
+            (1 << 20) / 2 / (100.0 * RUN.ASTRA_GBPS_TO_BYTES_PER_NS)
+        )
         factor, raw, error = RUN.infer_factor(cycles)
         self.assertEqual(factor, 0.5)
         self.assertLess(error, 0.01)
@@ -66,6 +68,7 @@ class AstraSimTests(unittest.TestCase):
             "topology: [ FullyConnected, FullyConnected, FullyConnected ]", text
         )
         self.assertIn("npus_count: [ 2, 2, 2 ]", text)
+        self.assertIn("9.313225746", text)
 
 
 if __name__ == "__main__":

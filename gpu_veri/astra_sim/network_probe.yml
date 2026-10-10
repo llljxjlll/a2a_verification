@@ -1,4 +1,5 @@
-# L0 comm_size semantics probe. 100 GB/s is exactly 100 bytes/ns.
+# L0 comm_size semantics probe. In this backend, input 100 means
+# 100*2^30/1e9 = 107.3741824 bytes/ns; the runner accounts for that convention.
 topology: [ FullyConnected, FullyConnected, FullyConnected ]
 npus_count: [ 2, 2, 2 ]
 bandwidth: [ 100.0, 100.0, 100.0 ]

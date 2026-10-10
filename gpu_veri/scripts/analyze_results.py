@@ -14,6 +14,7 @@ from typing import Iterable
 
 STAGES = ("s1", "s2", "s3")
 DIMENSION_STAGE = (("X", "s3"), ("Y", "s1"), ("W", "s2"))
+ASTRA_GBPS_TO_BYTES_PER_NS = (1 << 30) / 1_000_000_000
 
 
 def read_rows(path: Path) -> list[dict[str, str]]:
@@ -214,6 +215,7 @@ def write_astra_profiles(
             }
 
         bandwidth = [stages[stage]["astra_sim_bandwidth_gbps"] for _, stage in DIMENSION_STAGE]
+        network_bandwidth = [value / ASTRA_GBPS_TO_BYTES_PER_NS for value in bandwidth]
         latency = [stages[stage]["astra_sim_latency_ns"] for _, stage in DIMENSION_STAGE]
         mib = size // (1 << 20)
         filename = f"network_D_{mib}MiB.yml"
@@ -223,7 +225,8 @@ def write_astra_profiles(
             f"# Original per-rank A2A buffer D = {mib} MiB.",
             "topology: [ FullyConnected, FullyConnected, FullyConnected ]",
             "npus_count: [ 2, 2, 2 ]",
-            "bandwidth: [ " + ", ".join(f"{value:.9f}" for value in bandwidth) + " ]  # GB/s",
+            "# ASTRA analytical uses 1 GB=2^30 B; scaled from decimal GPU GB/s.",
+            "bandwidth: [ " + ", ".join(f"{value:.9f}" for value in network_bandwidth) + " ]  # ASTRA GB/s",
             "latency: [ " + ", ".join(f"{value:.3f}" for value in latency) + " ]  # ns",
             "",
         ]

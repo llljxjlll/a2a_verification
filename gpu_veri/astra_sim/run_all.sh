@@ -46,8 +46,19 @@ if [[ "${build_astra}" == 1 ]]; then
       exit 2
     fi
   done
-  echo "== Building both ASTRA-SIM analytical backends =="
-  "${astra_sim_dir}/build/astra_analytical/build.sh" -t all
+  # Conda's recent protobuf packages require Config-mode imported targets so
+  # Abseil/utf8_range transitive libraries are linked as well.
+  if [[ -n "${CONDA_PREFIX:-}" && \
+        -f "${CONDA_PREFIX}/lib/cmake/protobuf/protobuf-config.cmake" ]]; then
+    export CMAKE_PREFIX_PATH="${CONDA_PREFIX}${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}"
+    export PROTOBUF_FROM_SOURCE=True
+    export protobuf_DIR="${CONDA_PREFIX}/lib/cmake/protobuf"
+    if [[ -f "${CONDA_PREFIX}/lib/cmake/absl/abslConfig.cmake" ]]; then
+      export absl_DIR="${CONDA_PREFIX}/lib/cmake/absl"
+    fi
+  fi
+  echo "== Building ASTRA-SIM congestion-unaware analytical backend =="
+  "${astra_sim_dir}/build/astra_analytical/build.sh" -t congestion_unaware
 elif [[ "${build_astra}" != 0 ]]; then
   echo "ERROR: BUILD_ASTRA must be 0 or 1." >&2
   exit 2

@@ -136,8 +136,8 @@ python3 scripts/analyze_results.py \
 - `profiles.json`：保留每个阶段的实测时间、实测有效带宽、ASTRA-SIM 序列化带宽、延迟来源和维度映射。
 
 生成 GPU profile 后，可按 [`astra_sim/README.md`](astra_sim/README.md) 运行
-2×(2×2) ASTRA-SIM 对照实验。脚本会自动探测 `comm_size` 语义、运行两个
-analytical 后端，并生成逐点误差表。
+2×(2×2) ASTRA-SIM 对照实验。脚本会自动探测 `comm_size` 语义、运行支持
+多维网络的 congestion-unaware analytical 后端，并生成逐点误差表。
 
 ASTRA-SIM 配置的维度顺序是 `[X,Y,W]=[S3,S1,S2]`。实测有效带宽已经包含启动延迟，不能与非零 latency 直接同时填写；生成器使用 `B_astra=bytes/(t_median-L_eff)` 反推序列化带宽，使 `L_eff+bytes/B_astra` 恢复该点的实测 median。
 

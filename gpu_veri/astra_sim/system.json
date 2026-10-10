@@ -1,6 +1,6 @@
 {
   "scheduling-policy": "FIFO",
-  "endpoint-delay": 0,
+  "endpoint-delay": 1,
   "active-chunks-per-dimension": 1,
   "preferred-dataset-splits": 1,
   "boost-mode": 0,
