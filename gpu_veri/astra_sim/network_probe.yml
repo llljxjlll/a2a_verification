@@ -1,0 +1,5 @@
+# L0 comm_size semantics probe. 100 GB/s is exactly 100 bytes/ns.
+topology: [ FullyConnected, FullyConnected, FullyConnected ]
+npus_count: [ 2, 2, 2 ]
+bandwidth: [ 100.0, 100.0, 100.0 ]
+latency: [ 0.0, 0.0, 0.0 ]

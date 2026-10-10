@@ -125,6 +125,13 @@ class AnalysisTests(unittest.TestCase):
                 )
             self.assertTrue((profile_dir / "network_D_2MiB.yml").exists())
             self.assertTrue((profile_dir / "network_D_256MiB.yml").exists())
+            network_text = (profile_dir / "network_D_2MiB.yml").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(
+                "topology: [ FullyConnected, FullyConnected, FullyConnected ]",
+                network_text,
+            )
 
     def test_global_per_gpu_clock_filter(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

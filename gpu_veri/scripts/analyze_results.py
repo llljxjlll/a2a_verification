@@ -221,7 +221,7 @@ def write_astra_profiles(
             "# Empirical per-message ASTRA-SIM profile generated from A100 measurements.",
             "# Dimension order is [X, Y, W] = [S3 fast, S1 fast, S2 slow].",
             f"# Original per-rank A2A buffer D = {mib} MiB.",
-            "topology: [ Ring, Ring, Ring ]",
+            "topology: [ FullyConnected, FullyConnected, FullyConnected ]",
             "npus_count: [ 2, 2, 2 ]",
             "bandwidth: [ " + ", ".join(f"{value:.9f}" for value in bandwidth) + " ]  # GB/s",
             "latency: [ " + ", ".join(f"{value:.3f}" for value in latency) + " ]  # ns",
