@@ -314,7 +314,7 @@ void paced_exchange(void* s, void* r, size_t bytes, int peer,
 4. 迭代到 `|B_achieved − B_target| / B_target ≤ 3%`；
 5. **所有报告一律用实测值 `B_achieved`，不用配置值 `B_target`。**
 
-**交叉验证**：标定出的 `O` 在 `D = 2 MB`（单个小 chunk，开销占比最大）与 `D = 256 MB`（64 个满 chunk）两端都必须满足 3% 容差。若两端对不上，说明开销不是纯加性，需要重新建模而不是取折中值。
+**单一带宽模型诊断**：用标定出的 `O` 在 `D = 2 MB`（单个小 chunk，开销占比最大）与 `D = 256 MB`（64 个满 chunk）两端检查 3% 容差。若两端对不上，说明开销不是纯加性；程序记录警告但继续完成五点 sweep，随后为每个 D 导出独立的实测 ASTRA-SIM profile。逐点 profile 是参数回放，不能再作为跨消息大小预测证据。
 
 ### 5.5 锁频
 
@@ -522,6 +522,14 @@ mode,stage,pair,data_size_bytes,per_link_bytes,tier,target_bw_gbps,achieved_bw_g
 | `sm_clock_locked` | 是否成功锁频；`false` 时须按 §5.5「无 root 退路」处理 |
 | `pace_timer` | 固定为 `globaltimer`；出现 `clock64` 即为实现错误 |
 
+分析脚本还必须输出 `astra_sim_profiles/profiles.json` 和五份可直接使用的 analytical network YAML。对每个 D、每个阶段，使用实测 median `T` 与相应 1-byte 操作延迟 `L_eff` 计算：
+
+```
+B_astra(D) = per_link_bytes(D) / (T(D) - L_eff)
+```
+
+因此 ASTRA-SIM 的 `L_eff + bytes/B_astra` 恢复实测总时间，而不会把已经包含在有效带宽中的启动延迟重复计算。配置维度顺序固定为 `[X,Y,W]=[S3,S1,S2]`。
+
 ---
 
 ## 8. 测量协议
@@ -545,13 +553,14 @@ mode,stage,pair,data_size_bytes,per_link_bytes,tier,target_bw_gbps,achieved_bw_g
 程序应内置以下断言/检查：
 
 - [ ] **拓扑合法性**：统计所有 GPU 对之间的通信次数，**非邻居对（0–3, 1–2, 4–7, 5–6）必须为 0**
-- [ ] **达成带宽**：各层 `|B_achieved − B_target| / B_target < 3%`，且在 `D = 2 MB` 与 `D = 256 MB` **两端都满足**
+- [ ] **达成带宽诊断**：报告各点 `|B_achieved − B_target| / B_target`；超过 3% 时记录建模警告并使用该点实测 profile，不得伪造为目标值
 - [ ] **自旋实现**：用已知 ns 数单跑 `pace_kernel`，CUDA event 计时误差 ≤ 1%（§5.5 自检）
 - [ ] **无钳位**：全部数据点 `pace_clamped == 0`；否则该点限速失效，须剔除并在报告中声明
 - [ ] **字节计数**：软件统计的各阶段实际传输字节数，与 §4.4 的解析值逐项一致
 - [ ] **拓扑确认**：启动时打印 `nvidia-smi topo -m` 的解析结果，确认 GPU 映射与 §2 一致
 - [ ] **解析对照**：三个阶段的耗时占比应接近 §6.2 的 19% / 71% / 10%；各阶段耗时随 D 应为过原点线性
 - [ ] **分阶段上报**：CSV 必须含每个阶段的独立计时行。**只报总时间视为未完成** —— 见 §6.2 验证强度说明
+- [ ] **逐点 ASTRA-SIM 配置**：为 2/8/32/64/256 MB 分别输出 `[X,Y,W]` bandwidth/latency，并保证配置反算时间与对应实测 median 一致
 
 ### 环境前置检查
 
@@ -572,7 +581,7 @@ mode,stage,pair,data_size_bytes,per_link_bytes,tier,target_bw_gbps,achieved_bw_g
 1. **零热点**：2×2 mesh 拓扑上是 4 节点环，边传递，A2A 负载严格均匀。论文论断中"不均衡导致局部热点"这一机制**在本配置下未被检验**。
 2. **链路非物理隔离**：emulated link 共享 NVSwitch fabric 与 GPU 注入带宽，靠大余量限速近似独立信道，并非真正的专线。
 3. **阶段全退化**：三个阶段均为 2 成员组、单跳，未检验多成员 collective 的调度行为，也不涉及多跳转发。
-4. **仅验证带宽项**：扫描范围 2–256 MB 全部位于带宽主导区（测试台拐点约 120 KB），**模型的延迟项 `L_eff` 未被检验**。
+4. **逐点参数回放**：五个消息点分别使用实测 `B(D)` 与 `L_eff` 时，单点拟合不再检验跨消息大小预测；必须明确报告这一验证强度限制。
 5. **单对测量的损失**：拿不到 4 对之间的 straggler / p99，也拿不到跨阶段 overlap。三阶段单对耗时之和是算法总时间的**下界**，不是实测值。
 6. **口径一致性**：与 ASTRA-SIM 对照时，两边必须使用相同的测量口径（都用单对下界，或都用全量）。**口径一致比口径"正确"更重要。**
 

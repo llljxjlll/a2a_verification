@@ -79,7 +79,7 @@ class AnalysisTests(unittest.TestCase):
                     "B_achieved_gbps": 40, "latency_us": 5, "O_ns": 10,
                     "calib_iters": 2,
                     "cross_validation": {
-                        "D_2MiB_achieved_gbps": 40,
+                        "D_2MiB_achieved_gbps": 20,
                         "D_256MiB_achieved_gbps": 40,
                     },
                 },
@@ -100,7 +100,31 @@ class AnalysisTests(unittest.TestCase):
                     "--strict"]
             with patch.object(sys, "argv", argv):
                 self.assertEqual(MODULE.main(), 0)
-            self.assertIn("**通过。**", report.read_text(encoding="utf-8"))
+            report_text = report.read_text(encoding="utf-8")
+            self.assertIn("**数据完整性通过。**", report_text)
+            self.assertIn("建模警告", report_text)
+            profile_dir = root / "astra_sim_profiles"
+            manifest = json.loads((profile_dir / "profiles.json").read_text(encoding="utf-8"))
+            self.assertEqual(len(manifest["profiles"]), 5)
+            self.assertEqual(manifest["dimension_order"], ["X", "Y", "W"])
+            two_mib = manifest["profiles"][str(2 << 20)]
+            self.assertEqual(two_mib["stage_order"], ["s3", "s1", "s2"])
+            for index, stage in enumerate(two_mib["stage_order"]):
+                stage_data = two_mib["stages"][stage]
+                reconstructed_us = (
+                    stage_data["astra_sim_latency_ns"] / 1_000.0
+                    + stage_data["transfer_bytes"]
+                    / (stage_data["astra_sim_bandwidth_gbps"] * 1_000.0)
+                )
+                self.assertTrue(
+                    math.isclose(reconstructed_us, stage_data["measured_time_us"])
+                )
+                self.assertEqual(
+                    two_mib["bandwidth_gbps"][index],
+                    stage_data["astra_sim_bandwidth_gbps"],
+                )
+            self.assertTrue((profile_dir / "network_D_2MiB.yml").exists())
+            self.assertTrue((profile_dir / "network_D_256MiB.yml").exists())
 
     def test_global_per_gpu_clock_filter(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

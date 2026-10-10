@@ -1141,7 +1141,10 @@ void run_calibrate(const Options& opts) {
     });
   };
   if (!endpoint_ok(cal.fast) || !endpoint_ok(cal.slow))
-    throw std::runtime_error("calibration artifacts were written, but endpoint cross-validation failed");
+    std::cerr << "WARNING: endpoint cross-validation failed; continuing because "
+                 "the sweep will export empirical per-message ASTRA-SIM profiles. "
+                 "The single-bandwidth calibration must not be treated as valid "
+                 "for the full message-size range.\n";
   if (std::any_of(rows.begin(), rows.end(), [](const CsvRow& row) { return row.iters < 100; }))
     throw std::runtime_error("calibration artifacts were written, but fewer than 100 samples survived frequency filtering");
 }
@@ -1156,12 +1159,17 @@ void validate_calibration_compatibility(const Options& opts, const Calibration& 
     throw std::runtime_error("target bandwidth/ratio differs from calibration.json");
   if (cal.fast.raw < 3 * cal.fast.target || cal.slow.raw < 3 * cal.slow.target)
     throw std::runtime_error("calibration violates B_raw >= 3*B_target");
+  bool endpoint_failed = false;
   for (const TierCalibration* tier : {&cal.fast, &cal.slow}) {
     for (double achieved : tier->endpoint_achieved) {
       if (std::abs(achieved - tier->target) / tier->target > 0.03)
-        throw std::runtime_error("calibration failed its 2/256 MiB endpoint cross-validation");
+        endpoint_failed = true;
     }
   }
+  if (endpoint_failed)
+    std::cerr << "WARNING: calibration failed its 2/256 MiB endpoint "
+                 "cross-validation; sweep results will be consumed as "
+                 "per-message empirical ASTRA-SIM profiles.\n";
 }
 
 void run_stage_or_sweep(const Options& opts) {

@@ -10,8 +10,27 @@ skip_clock_lock="${SKIP_CLOCK_LOCK:-0}"
 iters="${ITERS:-100}"
 warmup="${WARMUP:-20}"
 device_map="${DEVICE_MAP:-0,1,2,3,4,5,6,7}"
+fast_bw="${FAST_BW:-40}"
+run_concurrency="${RUN_CONCURRENCY:-auto}"
 cpu_node="${CPU_NODE:-}"
 lock_succeeded=0
+
+IFS=',' read -r -a device_ids <<< "${device_map}"
+if [[ "${run_concurrency}" == auto ]]; then
+  if [[ "${#device_ids[@]}" == 8 ]]; then
+    run_concurrency=1
+  else
+    run_concurrency=0
+  fi
+fi
+if [[ "${run_concurrency}" != 0 && "${run_concurrency}" != 1 ]]; then
+  echo "ERROR: RUN_CONCURRENCY must be auto, 0, or 1." >&2
+  exit 1
+fi
+if [[ "${run_concurrency}" == 1 && "${#device_ids[@]}" != 8 ]]; then
+  echo "ERROR: RUN_CONCURRENCY=1 requires an 8-entry DEVICE_MAP." >&2
+  exit 1
+fi
 
 mkdir -p "${result_dir}"
 exec > >(tee "${result_dir}/run.log") 2>&1
@@ -20,7 +39,7 @@ echo "== Run metadata =="
 date --iso-8601=seconds
 hostname
 uname -a
-echo "DEVICE_MAP=${device_map} CPU_NODE=${cpu_node:-unset} CLOCK_MHZ=${clock_mhz} CLOCK_PRELOCKED=${clock_prelocked} SKIP_CLOCK_LOCK=${skip_clock_lock} ITERS=${iters} WARMUP=${warmup}"
+echo "DEVICE_MAP=${device_map} CPU_NODE=${cpu_node:-unset} FAST_BW=${fast_bw} RUN_CONCURRENCY=${run_concurrency} CLOCK_MHZ=${clock_mhz} CLOCK_PRELOCKED=${clock_prelocked} SKIP_CLOCK_LOCK=${skip_clock_lock} ITERS=${iters} WARMUP=${warmup}"
 env | grep '^NCCL_' | sort || true
 
 restore_clock() {
@@ -67,7 +86,7 @@ if [[ -n "${cpu_node}" ]]; then
 fi
 
 common=(
-  --fast-bw 40
+  --fast-bw "${fast_bw}"
   --ratio 7.5
   --chunk 4M
   --iters "${iters}"
@@ -84,15 +103,22 @@ common=(
 "${runner[@]}" "${build_dir}/a2a_bench" \
   --mode sweep --out "${result_dir}/results.csv" "${common[@]}"
 
-"${runner[@]}" "${build_dir}/a2a_bench" \
-  --mode concurrency --size 32M --out "${result_dir}/concurrency.csv" "${common[@]}"
+analysis_concurrency=()
+if [[ "${run_concurrency}" == 1 ]]; then
+  "${runner[@]}" "${build_dir}/a2a_bench" \
+    --mode concurrency --size 32M --out "${result_dir}/concurrency.csv" "${common[@]}"
+  analysis_concurrency=(--concurrency "${result_dir}/concurrency.csv")
+else
+  echo "Skipping concurrency scan; it requires 8 distinct GPUs."
+fi
 
 python3 "${project_dir}/scripts/analyze_results.py" \
   --csv "${result_dir}/results.csv" \
   --samples "${result_dir}/results.samples.csv" \
-  --concurrency "${result_dir}/concurrency.csv" \
+  "${analysis_concurrency[@]}" \
   --calibration "${result_dir}/calibration.json" \
   --out "${result_dir}/FINDINGS.md" \
+  --astra-dir "${result_dir}/astra_sim_profiles" \
   --strict
 
 echo "Results are in ${result_dir}"
